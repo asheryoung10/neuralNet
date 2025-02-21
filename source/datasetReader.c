@@ -63,7 +63,7 @@ void datasetReaderPrintImageAndLabel(const unsigned char* imageData, const unsig
     int imageOffset = imageSize * imageIndex;
     int label = labelData[imageIndex];
     printf("Printing image #%d. Label is %d.\n", imageIndex + 1, label);
-    for(int y = 0; y < imagesWidth; y++) {
+    for(int y = 0; y < imagesHeight; y++) {
         for(int x = 0; x < imagesWidth; x++) {
             if(imageData[imageOffset + (y * imagesWidth) + x] > 30) {
                 printf("#");

@@ -1,16 +1,17 @@
 #include <stdio.h>
-#include "datasetReader.h"
-#include "neural.h"
-#include <stdlib.h>
 #include "writeNetwork.h"
-
+#include "neural.h"
+#include "datasetReader.h"
+#include <stdlib.h>
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
 #define EPOCH_COUNT 2
-#define LEARNING_RATE 0.002
+#define LEARNING_RATE 0.001
 #define FIRST_HIDDEN_LAYER_NEURON_COUNT 512
 #define SECOND_HIDDEN_LAYER_NEURON_COUNT 11
 
-int main(int argumentCount, char* arguments[]) {
 
+int main(int argumentCount, char* arguments[]) {
     if(argumentCount != 5) {
         printf("Please supply location of training image and label dataset files followed by testing image and label dataset files.");
         return 0;
@@ -76,57 +77,10 @@ int main(int argumentCount, char* arguments[]) {
     float* firstLayerError = (float*) malloc(sizeof(float) * firstLayerRowCount);
     float* firstLayerWeightGradient = (float*) malloc(sizeof(float) * firstLayerRowCount * firstLayerColumnCount);
     float* firstLayerBiasGradient; // This will just be first layer error.
-    for(int epoch = 0; epoch < EPOCH_COUNT; epoch++) {
-        printf("Training Epoch %d/%d:\n", epoch + 1, EPOCH_COUNT);
-        int correctCount = 0;
-        for(int image = 0; image < trainingImageCount; image++) {
-     
-            if( (image+1) % 10000 == 0) {
-                printf("\t Image %d/%d\n", image+1, trainingImageCount);
-            }
-            // Forward Propogation
-            inputVector = &trainingImagesNormalized[image * trainingImagesWidth * trainingImagesHeight];
-            neuralMatrixVectorMultiply(firstHiddenLayerWeights, inputVector, firstIntermediateVector, firstLayerColumnCount, firstLayerRowCount);
-            neuralVectorVectorAdd(firstIntermediateVector, firstHiddenLayerBiases, firstIntermediateVector, firstLayerRowCount);
-            neuralVectorApplyRelu(firstIntermediateVector, firstLayerRowCount);
-
-            neuralMatrixVectorMultiply(secondHiddenLayerWeights, firstIntermediateVector, secondIntermediateVector, secondLayerRowCount, secondLayerColumnCount);
-            neuralVectorVectorAdd(secondIntermediateVector, secondHiddenLayerBiases, secondIntermediateVector, secondLayerRowCount);
-            neuralVectorApplySoftmax(secondIntermediateVector, secondLayerRowCount);
-            
-                
-            if(getPrediction(secondIntermediateVector, secondLayerRowCount) == (int) trainingLabels[image]) {
-               correctCount++; 
-            }
-          
-            // Backward Propogation.
-            // Find second layer gradients.
-            neuralVectorSetLabel(labelVector, secondLayerRowCount, trainingLabels[image]);
-            neuralComputeOutputError(secondIntermediateVector, labelVector, outputError, secondLayerRowCount);
-            neuralComputeSecondLayerGradient(outputError, firstIntermediateVector, secondLayerWeightGradient, secondLayerRowCount, firstLayerRowCount);
-            secondLayerBiasGradient = outputError;
-          
-            // Find first layer gradients
-            neuralComputeFirstLayerOutputError(secondHiddenLayerWeights, outputError, firstIntermediateVector, firstLayerError, secondLayerRowCount, secondLayerColumnCount);
-            neuralComputeFirstLayerGradient(firstLayerError, inputVector, firstLayerWeightGradient, firstLayerColumnCount, firstLayerRowCount);
-            firstLayerBiasGradient = firstLayerError;
-
-            // Update weights with gradients.
-            neuralUpdateWeights(firstHiddenLayerWeights, firstLayerWeightGradient, LEARNING_RATE, firstLayerRowCount, firstLayerColumnCount);
-            neuralUpdateWeights(secondHiddenLayerWeights, secondLayerWeightGradient, LEARNING_RATE, secondLayerRowCount, secondLayerColumnCount);
-            neuralUpdateBiases(firstHiddenLayerBiases, firstLayerBiasGradient, LEARNING_RATE, firstLayerRowCount);
-            neuralUpdateBiases(secondHiddenLayerBiases, secondLayerBiasGradient, LEARNING_RATE, secondLayerRowCount);
-          
-        }
-        printf("Epoch Accuracy: %f\n", correctCount / (float)trainingImageCount);
-    }
-    fprintf(stderr, "Writing to file: \n");
-    writeNetwork("networkFile.data", firstHiddenLayerWeights, firstHiddenLayerBiases, firstLayerColumnCount, 
-        firstLayerRowCount, secondHiddenLayerWeights, secondHiddenLayerBiases, secondLayerColumnCount, secondLayerRowCount);
-
-    printf("Running test: \n");
+    readNetwork("networkFile.data", firstHiddenLayerWeights, firstHiddenLayerBiases, &firstLayerColumnCount,
+    &firstLayerRowCount, secondHiddenLayerWeights, secondHiddenLayerBiases, &secondLayerColumnCount, &secondLayerRowCount);
     int correctCount = 0;
-    for(int image = 0; image < testingImageCount; image++) {
+    for(int image = 0; image < testingImageCount*0; image++) {
           // Forward Propogation
           inputVector = &testingImagesNormalized[image * trainingImagesWidth * trainingImagesHeight];
           neuralMatrixVectorMultiply(firstHiddenLayerWeights, inputVector, firstIntermediateVector, firstLayerColumnCount, firstLayerRowCount);
@@ -143,13 +97,29 @@ int main(int argumentCount, char* arguments[]) {
           }
     }
     printf("Accuracy is %f ", correctCount / (float) testingImageCount);
+    int x,y,n;
+    unsigned char *data = stbi_load("seven.png", &x, &y, &n, 0);
+     inputVector = malloc(sizeof(float) * 28 * 28);
+    for(int i = 0; i < x; i++) {
+        for(int j = 0; j < y; j++) {
+            inputVector[i * y + j] = data[(i * y  + j) * 3] / (float)255.0;
+            if(inputVector[i * y + j] > 0.2) {
+                printf("#");
+            }else {
+                printf("o");
+            }
+        }
+        printf("\n");
+    }
+    neuralMatrixVectorMultiply(firstHiddenLayerWeights, inputVector, firstIntermediateVector, firstLayerColumnCount, firstLayerRowCount);
+    neuralVectorVectorAdd(firstIntermediateVector, firstHiddenLayerBiases, firstIntermediateVector, firstLayerRowCount);
+    neuralVectorApplyRelu(firstIntermediateVector, firstLayerRowCount);
 
-    printf("Freeing memory.");
-    free(trainingImagesNormalized);
-    free(trainingLabels);
-
-
-    free(testingImagesNormalized);
-    free(testingLabels);
-     return 0;
+    neuralMatrixVectorMultiply(secondHiddenLayerWeights, firstIntermediateVector, secondIntermediateVector, secondLayerRowCount, secondLayerColumnCount);
+    neuralVectorVectorAdd(secondIntermediateVector, secondHiddenLayerBiases, secondIntermediateVector, secondLayerRowCount);
+    neuralVectorApplySoftmax(secondIntermediateVector, secondLayerRowCount);
+    printf("My prediction is %d.\n", getPrediction(secondIntermediateVector, secondLayerRowCount));      
+              
+    
+    
 }
